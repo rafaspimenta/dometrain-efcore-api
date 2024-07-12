@@ -26,7 +26,10 @@ public class MoviesController(MoviesContext context) : Controller
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Get([FromRoute] int id)
     {
-        var movie = await context.Movies.FindAsync(id);
+        var movie = await context.Movies
+            .Include(x => x.Genre)
+            .SingleOrDefaultAsync(x => x.Id == id);
+
         return movie == null ? NotFound() : Ok(movie);
     }
 
@@ -34,10 +37,20 @@ public class MoviesController(MoviesContext context) : Controller
     [ProducesResponseType(typeof(List<Movie>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAllByYear([FromRoute] int year)
     {
-        var allMovies = context.Movies;
-        var filteredMovies = context.Movies.Where(x => x.ReleaseDate.Year == year);
-        var result = await filteredMovies.ToListAsync();
-        return Ok(result);
+        var filteredMovies = await context.Movies.Where(x => x.ReleaseDate.Year == year)
+            .ToListAsync();
+
+        return Ok(filteredMovies);
+    }
+
+    [HttpGet("until-age/{ageRating}")]
+    [ProducesResponseType(typeof(List<Movie>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAllUntilAge([FromRoute] AgeRating ageRating)
+    {
+        var filteredMovies = await context.Movies.Where(x => x.AgeRating <= ageRating)
+            .ToListAsync();
+
+        return Ok(filteredMovies);
     }
 
     [HttpPost]
@@ -59,7 +72,7 @@ public class MoviesController(MoviesContext context) : Controller
         {
             return NotFound();
         }
-        existingMovie.UpdateMovieDetails(movie.Title, movie.ReleaseDate, movie.Synopsis);
+        existingMovie.ChangeMovieInformation(movie.Title, movie.ReleaseDate, movie.Synopsis);
         await context.SaveChangesAsync();
 
         return Ok(existingMovie);
